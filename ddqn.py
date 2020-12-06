@@ -57,12 +57,12 @@ class DDQN:
     self.r = reward
     self.s0 = s0
     self.alpha = 0.5
-    self.gamma = 0.99
+    self.gamma = 0.90#0.99
     
     self.history=[]
     self.mainnet = net
     self.targetnet = copy.deepcopy(net)
-    self.optimizer = optim.Adam(self.mainnet.parameters(),lr=0.000001)
+    self.optimizer = optim.Adam(self.mainnet.parameters(),lr=0.00001)
     self.criterion = nn.MSELoss()
 
     self.batch_size = 32
@@ -111,7 +111,7 @@ class DDQN:
           self.optimizer.zero_grad()
           loss.backward()
           self.optimizer.step()
-        if j%10==0:# taget networkを更新
+        if j%20==0:# taget networkを更新
           # self.targetnet=copy.deepcopy(self.mainnet)
           self.targetnet.load_state_dict(self.mainnet.state_dict())
           
