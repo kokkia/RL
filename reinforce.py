@@ -13,12 +13,12 @@ import torch.optim as optim
 
 class actor_net(nn.Module):
   def __init__(self,ns,na):
-      super(Net, self).__init__()
+      super(actor_net, self).__init__()
       self.fc1 = nn.Linear(ns, 30)
       self.dropout1 = nn.Dropout2d()
       self.fc2 = nn.Linear(30, 30)
       self.dropout2 = nn.Dropout2d()
-      self.fc3 = nn.Linear(30,na)
+      self.fc3 = nn.Linear(30,na) # mu, log(sigma**2)
 
   def forward(self, x):
       x = F.relu(self.fc1(x))
@@ -30,12 +30,12 @@ class actor_net(nn.Module):
 
 class critic_net(nn.Module):
   def __init__(self,ns,na):
-      super(Net, self).__init__()
+      super(critic_net, self).__init__()
       self.fc1 = nn.Linear(ns, 30)
       self.dropout1 = nn.Dropout2d()
       self.fc2 = nn.Linear(30, 30)
       self.dropout2 = nn.Dropout2d()
-      self.fc3 = nn.Linear(30,na)
+      self.fc3 = nn.Linear(30,1)# state value
 
   def forward(self, x):
       x = F.relu(self.fc1(x))
@@ -45,92 +45,116 @@ class critic_net(nn.Module):
       x = self.fc3(x)
       return x
 
-
 class REINFORCE:
-  def __init__(self,dstates, dactions, s0, reward, epsilon, nepisode,actor_net,critic_net):
+  def __init__(self,dstates, dactions, s0, reward, nepisode,actor_net,critic_net):
     # self.states = states
     # self.actions = actions
     self.ns = dstates
     self.na = dactions
-    self.epsilon = epsilon
-    self.nepisode = nepisode
+    self.max_episode_step = nepisode
     self.r = reward
     self.s0 = s0
     self.alpha = 0.5
-    self.gamma = 0.95#0.99
+    self.gamma = 0.99#0.99
     
-    self.history=[]
-    self.mainnet = net
-    self.targetnet = copy.deepcopy(net)
-    self.optimizer = optim.Adam(self.mainnet.parameters(),lr=0.0001)
-    self.criterion = nn.MSELoss()
-
-    self.batch_size = 32
-    self.exp = experience_replay(self.batch_size)
+    self.history = []
+    self.memory = []
+    # actor
+    self.actor_net = actor_net
+    self.actor_optimizer = optim.Adam(self.actor_net.parameters(),lr=0.001)
+    self.actor_criterion = nn.MSELoss()
+    # critic
+    self.critic_net = critic_net
+    self.critic_optimizer = optim.Adam(self.critic_net.parameters(),lr=0.001)
+    self.critic_criterion = nn.MSELoss()
 
   def learn(self):
-    t = []
+    iter = []
     l = []
     for i in range(300):
       s = copy.deepcopy(self.s0)
-    #   s= env.reset()
-      print(self.s0,s)
-      for j in range(self.nepisode):
+      # print(self.s0,s)
+
+      # 1episode計算
+      steps = 0
+      self.actor_net.eval()
+      while True:
+        steps += 1    
         # 行動決定
-        if np.random.uniform(0,1)<self.epsilon:
-          a = np.random.choice(self.actions)
-        else:
-          ts = torch.from_numpy(s.astype(np.float32)).clone()
-          self.Q = self.targetnet.forward(ts)
-          self.Q = self.Q.to('cpu').detach().numpy().copy()
-          a = np.argmax(self.Q)
+        ts = torch.from_numpy(s.astype(np.float32)).clone()
+        a = self.actor_net.forward(ts)
+        a = a.to('cpu').detach().numpy().copy()
+        mu = a[:self.na]
+        logvar = a[self.na:]
+        var = np.exp(logvar)
+        action = np.random.normal(loc=mu, scale=np.sqrt(var))
         # print(s,a)
-        r, s_, fin = self.r(s, a)  # 行動の結果、rewardと状態が帰ってくる
-        print(s,a,s_,r)
+        r, s_, fin = self.r(s, action)  # 行動の結果、rewardと状態が帰ってくる
+        # print(s,a,s_,r)
         # addmemory
-        self.exp.add(s,a,s_,r)
-        # replay
-        if len(self.exp.memory) < self.batch_size:
-          continue
-        batches = self.exp.sample()
-        for k, batch in enumerate(batches, 0):
-          rs,ra,rs_,rr = batch
-        #   print(rs,ra,rs_,rr)
-          # Q値を計算 
-          self.mainnet.eval()
-          self.targetnet.eval()
-          ts = torch.from_numpy(rs.astype(np.float32)).clone()
-          ts_ = torch.from_numpy(rs_.astype(np.float32)).clone()
-          Qs = self.mainnet.forward(ts)
-          Qs_ = self.targetnet.forward(ts_).detach()
-          Qr = rr+self.gamma*Qs_.max()
-          # loss = self.criterion(Qr,Qs[ra])
-          # 学習
-          self.mainnet.train()
-          loss = F.smooth_l1_loss(Qr,Qs[ra])
-          self.optimizer.zero_grad()
-          loss.backward()
-          self.optimizer.step()
-        if j%20==0:# taget networkを更新
-          # self.targetnet=copy.deepcopy(self.mainnet)
-          self.targetnet.load_state_dict(self.mainnet.state_dict())
-          
-        # train
-        # self.Q[s,a] += self.alpha*(r+self.gamma*np.max(self.Q[s_,:])-self.Q[s,a])# TD学習
+        self.memory.append((s,a,action,s_,r))
+        # update
         s = copy.deepcopy(s_)
-        self.history.append(s)
         if fin==1:
-          print("\n episode end epidode:",i,"j=",j,"\n")
-        #   plt.pause(1)
-          break
-        # print(self.Q)
-      if (i + 1) % 50 == 0:
-        torch.save(self.targetnet.state_dict(), "out/dnn" + str(i + 1) +".pt")
-        print("loss=",loss)
+            # print("\n episode end episode:",i," step:",step,"\n")
+            break
+        if steps > self.max_episode_step:
+            break
+
+      # 学習
+      advanteges = []
+      state_values = []
+      states = []
+      actions = []
+      for t, step in enumerate(self.memory):
+        s,a,action,s_,r = step
+        # 割引報酬計算
+        Gt = 0
+        for j, mem in enumerate(self.memory[t:]):
+          rs, ra, raction, rs_, rr = copy.deepcopy(mem)
+          Gt += self.gamma ** j * rr
+        Gt = torch.from_numpy(np.array([Gt]).astype(np.float32)).clone()
+        # 状態価値計算
+        self.critic_net.eval()
+        ts = torch.from_numpy(s.astype(np.float32)).clone()
+        state_value = self.critic_net.forward(ts)
+        # advantege計算
+        advantege = Gt - state_value
+        # 保存
+        advanteges.append(advantege)
+        state_values.append(state_value)
+        states.append(s)
+        actions.append(a)
+
+        # network更新
+        self.actor_net.train()
+        self.critic_net.train()
+        # 方策勾配計算
+        mu = ra[:self.na]
+        logvar = ra[self.na:]
+        action = raction
+        var = np.exp(logvar)
+        logpi = -0.5 * logvar - 0.5 * (action - mu)**2 / var# 次元注意
+        logpi = torch.from_numpy(logpi.astype(np.float32)).clone()
+        actor_loss = -logpi * advantege
+        self.actor_optimizer.zero_grad()
+        actor_loss.backward(retain_graph=True)
+        self.actor_optimizer.step()
+        # critic
+        critic_loss = F.smooth_l1_loss(Gt,state_value)
+        self.critic_optimizer.zero_grad()
+        critic_loss.backward()
+        self.critic_optimizer.step()
         
-      t.append(i)
-      l.append(loss)
-    plt.plot(t, l, '-k')
+      print("episode", i, "reward", r, "al", actor_loss, "cl", critic_loss)
+
+      if (i + 1) % 50 == 0:
+        torch.save(self.actor_net.state_dict(), "out_RF/dnn" + str(i + 1) +".pt")
+        print("loss=",actor_loss)
+        
+      iter.append(i)
+      l.append(Gt)
+    plt.plot(iter, l, '-k')
     plt.show()
 
   def reward(self, s,a):
@@ -147,32 +171,3 @@ class REINFORCE:
 
     a = np.argmax(self.Q[0,:])
     return a
-
-# i_epi = 0
-
-# env = gym.make('CartPole-v0')
-# # env = gym.make('MountainCar-v0')
-# def reward(s, a):
-#     global i_epi
-#     env.render()
-#     i_epi += 1
-#     s_, r, fin, inf0 = env.step(a)
-#     r += (1 - abs(s[2]))
-#     r += 1 - abs(s[0])
-#     r+=float(i_epi)/10
-
-#     # print(np.array(s_))
-#     if fin == 1:
-#       i_epi = 0
-#       plt.pause(0.01)
-#       s= env.reset()
-#     return r, np.array(s_), fin
-    
-# Qnet = Net(4,2)
-# td = DDQN(1,np.array([0,1]),np.array(env.reset()),reward,0.2, 200,Qnet)
-# td.learn()
-# print(td.Q)
-
-# env.close()
-
-

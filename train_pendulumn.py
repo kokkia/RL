@@ -19,26 +19,27 @@ env.reset()
 i_epi = 0
 def reward(s, a):
     global i_epi
-    env.render()
+    # env.render()
     i_epi += 1
     s_, r, fin, info = env.step(action=a)
-    r += s[1]
-    r += - abs(s[0])/8.0
+    # r += s_[1]
+    # r += - abs(s_[0])/32.0
+    r = r/10
 
     # print(np.array(s_))
     if fin == 1:
-      if i_epi < 100:
-          r += -1
-      i_epi = 0
-      plt.pause(0.01)
+      # if i_epi < 50:
+      #     r += -1
+      # i_epi = 0
+      # plt.pause(0.01)
       s= env.reset()
     return r, np.array(s_), fin
 
 
 a_net = reinforce.actor_net(3,2)
 c_net = reinforce.critic_net(3,1)
-td = ddqn.DDQN(4,np.array([0,1]),np.array(env.reset()),reward2,0.2, 200,Qnet)
-td.learn()
+rl = reinforce.REINFORCE(3,1,np.array(env.reset()),reward,100,a_net,c_net)
+rl.learn()
 print(td.Q)
 
 env.close()
