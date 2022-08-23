@@ -10,7 +10,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-import reinforce
+import ddpg
 import gym
 
 env = gym.make("Pendulum-v0")
@@ -36,11 +36,11 @@ def reward(s, a):
     return r, np.array(s_), fin
 
 
-a_net = reinforce.actor_net(3,2)
-c_net = reinforce.critic_net(3,1)
-rl = reinforce.REINFORCE(3,1,np.array(env.reset()),reward,100,a_net,c_net)
+a_net = ddpg.actor_net(3,1)
+c_net = ddpg.critic_net(4,1)
+rl = ddpg.DDPG(3,1,np.array(env.reset()),reward,100,a_net,c_net)
 rl.learn()
-print(td.Q)
+# print(td.a)
 
 env.close()
 
