@@ -73,13 +73,13 @@ class DDPG:
     self.s0 = s0
     self.alpha = 0.5
     self.gamma = 0.99
-    self.tau = 0.1
+    self.tau = 0.001
     
     self.history=[]
     # actor
     self.actor_net = actor_net
     self.actor_target = copy.deepcopy(actor_net)
-    self.actor_optimizer = optim.Adam(self.actor_net.parameters(),lr=0.001)
+    self.actor_optimizer = optim.Adam(self.actor_net.parameters(),lr=0.0001)
     self.actor_criterion = nn.MSELoss()
     # critic
     self.critic_net = critic_net
@@ -87,7 +87,7 @@ class DDPG:
     self.critic_optimizer = optim.Adam(self.critic_net.parameters(),lr=0.001)
     self.critic_criterion = nn.MSELoss()
 
-    self.batch_size = 32
+    self.batch_size = 64
     self.exp = experience_replay(self.batch_size)
 
   def learn(self):
@@ -97,15 +97,17 @@ class DDPG:
       s = copy.deepcopy(self.s0)
     #   s= env.reset()
       print(self.s0,s)
+      total_reward = 0
       for j in range(self.nepisode):
         # 行動決定
         ts = torch.from_numpy(s.astype(np.float32)).clone()
         a = self.actor_net.forward(ts)
         a = a.to('cpu').detach().numpy().copy()
-        a = a + np.random.rand(self.na)
+        a = a + np.random.randn(self.na)*0.5
         # print(s,a)
         r, s_, fin = self.r(s, a)  # 行動の結果、rewardと状態が帰ってくる
-        print(s,a,s_,r)
+        total_reward += r
+        # print(s,a,s_,r)
         # addmemory
         self.exp.add(s,a,s_,r)
         # replay
@@ -137,7 +139,7 @@ class DDPG:
           # actor
           actor_loss = - self.critic_net.forward(tx).mean()
           self.actor_optimizer.zero_grad()
-          actor_loss.backward(retain_graph=True)
+          actor_loss.backward()
           self.actor_optimizer.step()
 
           for target_param, param in zip(self.actor_target.parameters(), self.actor_net.parameters()):
@@ -151,11 +153,10 @@ class DDPG:
         self.history.append(s)
         if fin==1:
           print("\n episode end epidode:",i,"j=",j,"\n")
-        #   plt.pause(1)
           break
-        # print(self.Q)
-      if (i + 1) % 50 == 0:
-        torch.save(self.actor_target.state_dict(), "out/dnn" + str(i + 1) +".pt")
+      print("total_reward", total_reward)
+      if (i + 1) % 10 == 0:
+        torch.save(self.actor_target.state_dict(), "out_RF/dnn" + str(i + 1) +".pt")
         print("loss=",actor_loss)
         
       t.append(i)

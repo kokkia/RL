@@ -24,7 +24,7 @@ def reward(s, a):
     s_, r, fin, info = env.step(action=a)
     # r += s_[1]
     # r += - abs(s_[0])/32.0
-    r = r/10
+    # r = r/10
 
     # print(np.array(s_))
     if fin == 1:
