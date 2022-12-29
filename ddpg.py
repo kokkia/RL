@@ -14,35 +14,36 @@ import torch.optim as optim
 class actor_net(nn.Module):
   def __init__(self,ns,na):
       super(actor_net, self).__init__()
-      self.fc1 = nn.Linear(ns, 30)
-      self.dropout1 = nn.Dropout2d()
-      self.fc2 = nn.Linear(30, 30)
-      self.dropout2 = nn.Dropout2d()
-      self.fc3 = nn.Linear(30,na) # mu, log(sigma**2)
+      self.fc1 = nn.Linear(ns, 16)
+      # self.dropout1 = nn.Dropout2d()
+      self.fc2 = nn.Linear(16, 16)
+      self.fc3 = nn.Linear(16, 16)
+      # self.dropout2 = nn.Dropout2d()
+      self.fc4 = nn.Linear(16,na) # mu, log(sigma**2)
 
   def forward(self, x):
       x = F.relu(self.fc1(x))
-      # x = self.dropout1(x)
       x = F.relu(self.fc2(x))
-      # x = self.dropout2(x)
-      x = self.fc3(x)
+      x = F.relu(self.fc3(x))
+      x = self.fc4(x)
       return x
 
 class critic_net(nn.Module):
   def __init__(self,ns,na):
       super(critic_net, self).__init__()
-      self.fc1 = nn.Linear(ns, 30)
-      self.dropout1 = nn.Dropout2d()
-      self.fc2 = nn.Linear(30, 30)
-      self.dropout2 = nn.Dropout2d()
-      self.fc3 = nn.Linear(30,1)# state value
+      self.fc1 = nn.Linear(ns, 32)
+      # self.dropout1 = nn.Dropout2d()
+      self.fc2 = nn.Linear(32, 32)
+      # self.dropout2 = nn.Dropout2d()
+      self.fc3 = nn.Linear(32, 32)
+      # self.dropout2 = nn.Dropout2d()
+      self.fc4 = nn.Linear(32,1)# state value
 
   def forward(self, x):
       x = F.relu(self.fc1(x))
-      # x = self.dropout1(x)
       x = F.relu(self.fc2(x))
-      # x = self.dropout2(x)
-      x = self.fc3(x)
+      x = F.relu(self.fc3(x))
+      x = self.fc4(x)
       return x
 
 
@@ -71,7 +72,6 @@ class DDPG:
     self.nepisode = nepisode
     self.r = reward
     self.s0 = s0
-    self.alpha = 0.5
     self.gamma = 0.99
     self.tau = 0.001
     
@@ -84,7 +84,7 @@ class DDPG:
     # critic
     self.critic_net = critic_net
     self.critic_target = copy.deepcopy(critic_net)
-    self.critic_optimizer = optim.Adam(self.critic_net.parameters(),lr=0.001)
+    self.critic_optimizer = optim.Adam(self.critic_net.parameters(),lr=0.001, weight_decay=0.01)
     self.critic_criterion = nn.MSELoss()
 
     self.batch_size = 64
@@ -132,7 +132,7 @@ class DDPG:
           self.actor_net.train()
           self.critic_net.train()
           # critic
-          critic_loss = F.smooth_l1_loss(ty,Q)
+          critic_loss = F.mse_loss(ty,Q)
           self.critic_optimizer.zero_grad()
           critic_loss.backward()
           self.critic_optimizer.step()
@@ -170,8 +170,8 @@ class DDPG:
   def action(self,s):
     # s = np.array([s])
     ts = torch.from_numpy(s.astype(np.float32)).clone()
-    ts = ts.unsqueeze(dim=0)
-    ts = torch.tensor(ts, dtype=torch.float)
+    # ts = ts.unsqueeze(dim=0)
+    # ts = torch.tensor(ts, dtype=torch.float)
     ta = self.actor_target.forward(ts)
     a = ta.to('cpu').detach().numpy().copy()
     return a
