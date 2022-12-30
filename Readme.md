@@ -3,9 +3,11 @@
 いずれはライブラリ化, kal_pythonに統合
 
 ## Libraries required for kal_RL
-- numpy
+- numpy == 1.22.0
 - matplotlib
-- pytorch
+- pytorch == 1.13.1
+- gym == 0.26.2
+- pygame == 2.1.0
 
 ## @todo make rl modules like
 - dqn.py
