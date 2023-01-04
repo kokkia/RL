@@ -24,3 +24,6 @@
 	-v /tmp/.X11-unix:/tmp/.X11-uni \ 
 	-v /mnt/wslg:/mnt/wslg \ 
 	``` 
+
+## Reference
+- https://blog.mohyo.net/2022/02/11591/

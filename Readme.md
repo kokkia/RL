@@ -8,6 +8,7 @@
 - pytorch == 1.13.1
 - gym == 0.26.2
 - pygame == 2.1.0
+- tensorflow == 2.11.0
 
 ## @todo make rl modules like
 - dqn.py
@@ -15,3 +16,11 @@
 - ddpg.py
 - A3C.py
 - A2C.py
+
+## Error
+- tensorboard : command not found  
+    reinstall tensorflow
+    ```
+    $ sudo pip uninstall tensorflow  
+    $ sudo pip install tensorflow
+    ```
