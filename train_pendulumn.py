@@ -13,32 +13,32 @@ import torch.optim as optim
 import ddpg
 import gym
 
-env = gym.make("Pendulum-v0")
-env.reset()
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+# device = 'cpu'
 
-i_epi = 0
-def reward(s, a):
-    global i_epi
-    # env.render()
-    i_epi += 1
-    s_, r, fin, info = env.step(action=a)
-    # r += s_[1]
-    # r += - abs(s_[0])/32.0
-    # r = r/10
+class environment:
+  def __init__(self):
+    self.env = gym.make("Pendulum-v1")
+    self.env.reset()
+    self.max_steps = self.env.spec.max_episode_steps
 
-    # print(np.array(s_))
-    if fin == 1:
-      # if i_epi < 50:
-      #     r += -1
-      # i_epi = 0
-      # plt.pause(0.01)
-      s= env.reset()
-    return r, np.array(s_), fin
+  def reset(self):
+    s = self.env.reset()[0]
+    return s
 
+  def reward(self, s, a):
+      # env.render()
+      s_, r, terminated, truncated, info = self.env.step(a)
+      fin = terminated or truncated
+      return r, np.array(s_), fin
 
-a_net = ddpg.actor_net(3,1)
-c_net = ddpg.critic_net(4,1)
-rl = ddpg.DDPG(3,1,np.array(env.reset()),reward,100,a_net,c_net)
+env = environment()
+max_steps = env.max_steps
+max_episodes = 200
+s0 = env.reset()
+a_net = ddpg.actor_net(3,1).to(device)
+c_net = ddpg.critic_net(3,1).to(device)
+rl = ddpg.DDPG(3,1,s0,env,max_steps, max_episodes,a_net,c_net,device)
 rl.learn()
 # print(td.a)
 

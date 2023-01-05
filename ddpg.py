@@ -9,41 +9,49 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+from torch.utils.tensorboard import SummaryWriter
 
+from ornstein_uhlenbeck_process import *
+
+
+def init_weight(size):
+    f = size[0]
+    v = 1. / np.sqrt(f)
+    return torch.tensor(np.random.uniform(low=-v, high=v, size=size), dtype=torch.float)
 
 class actor_net(nn.Module):
   def __init__(self,ns,na):
       super(actor_net, self).__init__()
-      self.fc1 = nn.Linear(ns, 16)
-      # self.dropout1 = nn.Dropout2d()
-      self.fc2 = nn.Linear(16, 16)
-      self.fc3 = nn.Linear(16, 16)
-      # self.dropout2 = nn.Dropout2d()
-      self.fc4 = nn.Linear(16,na) # mu, log(sigma**2)
+      self.fc1 = nn.Linear(ns, 400)
+      self.fc2 = nn.Linear(400, 300)
+      self.fc3 = nn.Linear(300, na)
+      init_w = 3e-3
+      self.fc1.weight.data = init_weight(self.fc1.weight.data.size())
+      self.fc2.weight.data = init_weight(self.fc2.weight.data.size())
+      self.fc3.weight.data.uniform_(-init_w, init_w)
 
   def forward(self, x):
       x = F.relu(self.fc1(x))
       x = F.relu(self.fc2(x))
-      x = F.relu(self.fc3(x))
-      x = self.fc4(x)
+      x = torch.tanh(self.fc3(x))
       return x
 
 class critic_net(nn.Module):
   def __init__(self,ns,na):
       super(critic_net, self).__init__()
-      self.fc1 = nn.Linear(ns, 32)
-      # self.dropout1 = nn.Dropout2d()
-      self.fc2 = nn.Linear(32, 32)
-      # self.dropout2 = nn.Dropout2d()
-      self.fc3 = nn.Linear(32, 32)
-      # self.dropout2 = nn.Dropout2d()
-      self.fc4 = nn.Linear(32,1)# state value
+      self.fc1 = nn.Linear(ns, 400)
+      self.fc2 = nn.Linear(400+na, 300)
+      self.fc3 = nn.Linear(300,1)# state value
 
-  def forward(self, x):
+      init_w = 3e-4
+      self.fc1.weight.data = init_weight(self.fc1.weight.data.size())
+      self.fc2.weight.data = init_weight(self.fc2.weight.data.size())
+      self.fc3.weight.data.uniform_(-init_w, init_w)
+
+  def forward(self, x, action):
       x = F.relu(self.fc1(x))
-      x = F.relu(self.fc2(x))
-      x = F.relu(self.fc3(x))
-      x = self.fc4(x)
+      x = F.relu(self.fc2(torch.cat([x,action],dim=0)))
+      x = self.fc3(x)
       return x
 
 
@@ -51,7 +59,7 @@ class experience_replay:
   def __init__(self,batch_size):
     self.batch_size = batch_size
     self.memory = []
-    self.memory_size = 1000
+    self.memory_size = 1000000
     
   def add(self,s,a,s_,r):
     self.memory.append((s, a, s_, r))
@@ -62,50 +70,68 @@ class experience_replay:
     exps = random.sample(self.memory,self.batch_size)
     return exps
 
+  def reset(self):
+    self.memory.clear()
+
 class DDPG:
-  def __init__(self,dstates, dactions, s0, reward, nepisode, actor_net, critic_net):
-    # self.states = states
-    self.actions = dactions
+  def __init__(self,dstates, dactions, s0, env, max_steps, max_episodes, actor_net, critic_net, device):
     self.ns = dstates
     self.na = dactions
-    # self.epsilon = epsilon
-    self.nepisode = nepisode
-    self.r = reward
+    self.max_steps = max_steps
+    self.max_episodes = max_episodes
+    self.env = env
     self.s0 = s0
-    self.gamma = 0.99
-    self.tau = 0.001
+    self.gamma = 0.99# 割引率
+    self.tau = 0.001# ターゲット更新率
+    self.batch_size = 64
+    self.lr_actor = 1e-4
+    self.lr_critic = 1e-3
+    self.epsilon = 1.0
+
+    self.device = device
+    self.random_process = OrnsteinUhlenbeckProcess(size=self.na)
     
-    self.history=[]
     # actor
     self.actor_net = actor_net
     self.actor_target = copy.deepcopy(actor_net)
-    self.actor_optimizer = optim.Adam(self.actor_net.parameters(),lr=0.0001)
+    self.actor_optimizer = optim.Adam(self.actor_net.parameters(),lr=self.lr_actor)
     self.actor_criterion = nn.MSELoss()
     # critic
     self.critic_net = critic_net
     self.critic_target = copy.deepcopy(critic_net)
-    self.critic_optimizer = optim.Adam(self.critic_net.parameters(),lr=0.001, weight_decay=0.01)
+    self.critic_optimizer = optim.Adam(self.critic_net.parameters(),lr=self.lr_critic, weight_decay=0.01)
     self.critic_criterion = nn.MSELoss()
 
-    self.batch_size = 64
+    # experimental replay
     self.exp = experience_replay(self.batch_size)
+
+    # log
+    self.writer = SummaryWriter(log_dir="./logs")
+
+    self.history=[]
+
+  
+  def get_action(self, s, greedy=False):
+      ts = torch.from_numpy(s.astype(np.float32)).clone()
+      ts = ts.to(self.device)
+      a = self.actor_net.forward(ts)
+      if not greedy:
+        a = a + self.epsilon*torch.tensor(self.random_process.sample(), dtype=torch.float, device=self.device)
+      a = a.to(device=self.device).detach().cpu().numpy().copy()
+      return a
 
   def learn(self):
     t = []
     l = []
-    for i in range(300):
-      s = copy.deepcopy(self.s0)
-    #   s= env.reset()
-      print(self.s0,s)
+    for episode in range(self.max_episodes):
+      s= self.env.reset()
+      print("initial_state",s)
       total_reward = 0
-      for j in range(self.nepisode):
+      for step in range(self.max_steps):
         # 行動決定
-        ts = torch.from_numpy(s.astype(np.float32)).clone()
-        a = self.actor_net.forward(ts)
-        a = a.to('cpu').detach().numpy().copy()
-        a = a + np.random.randn(self.na)*0.5
+        a = self.get_action(s)
         # print(s,a)
-        r, s_, fin = self.r(s, a)  # 行動の結果、rewardと状態が帰ってくる
+        r, s_, fin = self.env.reward(s, a)  # 行動の結果、rewardと状態が帰ってくる
         total_reward += r
         # print(s,a,s_,r)
         # addmemory
@@ -119,15 +145,17 @@ class DDPG:
         #   print(rs,ra,rs_,rr)
           # Q値を計算 
           trs_ = torch.from_numpy(rs_.astype(np.float32)).clone()
+          trs_ = trs_.to(self.device)
           tra_ = self.actor_target.forward(trs_)
-          tx_ = torch.cat([trs_, tra_], dim=0)
-          Q_ = self.critic_target.forward(tx_)
+          Q_ = self.critic_target.forward(trs_,tra_)
           trr = torch.from_numpy(np.array([rr]).astype(np.float32)).clone()
-          ty = trr + Q_
+          trr = trr.to(self.device)
+          ty = trr + self.gamma*Q_
           trs = torch.from_numpy(rs.astype(np.float32)).clone()
+          trs = trs.to(self.device)
           tra = torch.from_numpy(ra.astype(np.float32)).clone()
-          tx = torch.cat([trs, tra], dim=0)
-          Q = self.critic_net.forward(tx)
+          tra = tra.to(self.device)
+          Q = self.critic_net.forward(trs,tra)
           # network更新
           self.actor_net.train()
           self.critic_net.train()
@@ -137,7 +165,7 @@ class DDPG:
           critic_loss.backward()
           self.critic_optimizer.step()
           # actor
-          actor_loss = - self.critic_net.forward(tx).mean()
+          actor_loss = - self.critic_net.forward(trs,tra).mean()
           self.actor_optimizer.zero_grad()
           actor_loss.backward()
           self.actor_optimizer.step()
@@ -152,27 +180,31 @@ class DDPG:
         s = copy.deepcopy(s_)
         self.history.append(s)
         if fin==1:
-          print("\n episode end epidode:",i,"j=",j,"\n")
+          print("\n episode end epidode:",episode,"step=",step,"\n")
           break
       print("total_reward", total_reward)
-      if (i + 1) % 10 == 0:
-        torch.save(self.actor_target.state_dict(), "out_RF/dnn" + str(i + 1) +".pt")
-        print("loss=",actor_loss)
+      if (episode + 1) % 10 == 0:
+        torch.save(self.actor_target.state_dict(), "out_DDPG/dnn" + str(episode + 1) +".pt")
+        print("critic loss=",critic_loss)
+      self.writer.add_scalar("total reward", total_reward,episode)
+      self.writer.add_scalar("critic_loss", critic_loss, episode)
+      self.writer.add_scalar("actor_loss", actor_loss, episode)
         
-      t.append(i)
-      l.append(actor_loss)
+      t.append(episode)
+      l.append(critic_loss)
     plt.plot(t, l, '-k')
     plt.show()
+    self.writer.close()
 
   def reward(self, s,a):
     return self.r(s,a)
 
-  def action(self,s):
-    # s = np.array([s])
-    ts = torch.from_numpy(s.astype(np.float32)).clone()
-    # ts = ts.unsqueeze(dim=0)
-    # ts = torch.tensor(ts, dtype=torch.float)
-    ta = self.actor_target.forward(ts)
-    a = ta.to('cpu').detach().numpy().copy()
-    return a
+  # def action(self,s):
+  #   # s = np.array([s])
+  #   ts = torch.from_numpy(s.astype(np.float32)).clone()
+  #   # ts = ts.unsqueeze(dim=0)
+  #   # ts = torch.tensor(ts, dtype=torch.float)
+  #   ta = self.actor_target.forward(ts)
+  #   a = ta.to('cpu').detach().numpy().copy()
+  #   return a
 
