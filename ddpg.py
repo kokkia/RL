@@ -33,7 +33,7 @@ class actor_net(nn.Module):
   def forward(self, x):
       x = F.relu(self.fc1(x))
       x = F.relu(self.fc2(x))
-      x = torch.tanh(self.fc3(x))
+      x = torch.tanh(self.fc3(x))*2
       return x
 
 class critic_net(nn.Module):
@@ -50,7 +50,7 @@ class critic_net(nn.Module):
 
   def forward(self, x, action):
       x = F.relu(self.fc1(x))
-      x = F.relu(self.fc2(torch.cat([x,action],dim=0)))
+      x = F.relu(self.fc2(torch.cat([x,action],dim=1)))
       x = self.fc3(x)
       return x
 
@@ -133,52 +133,50 @@ class DDPG:
         # print(s,a)
         r, s_, fin = self.env.reward(s, a)  # 行動の結果、rewardと状態が帰ってくる
         total_reward += r
-        # print(s,a,s_,r)
+        print(s,a,s_,r)
         # addmemory
         self.exp.add(s,a,s_,r)
         # replay
-        if len(self.exp.memory) < self.batch_size:
-          continue
-        batches = self.exp.sample()
-        for k, batch in enumerate(batches, 0):
-          rs,ra,rs_,rr = batch
-        #   print(rs,ra,rs_,rr)
-          # Q値を計算 
-          trs_ = torch.from_numpy(rs_.astype(np.float32)).clone()
-          trs_ = trs_.to(self.device)
-          tra_ = self.actor_target.forward(trs_)
-          Q_ = self.critic_target.forward(trs_,tra_)
-          trr = torch.from_numpy(np.array([rr]).astype(np.float32)).clone()
-          trr = trr.to(self.device)
-          ty = trr + self.gamma*Q_
-          trs = torch.from_numpy(rs.astype(np.float32)).clone()
-          trs = trs.to(self.device)
-          tra = torch.from_numpy(ra.astype(np.float32)).clone()
-          tra = tra.to(self.device)
-          Q = self.critic_net.forward(trs,tra)
-          # network更新
-          self.actor_net.train()
-          self.critic_net.train()
-          # critic
-          critic_loss = F.mse_loss(ty,Q)
-          self.critic_optimizer.zero_grad()
-          critic_loss.backward()
-          self.critic_optimizer.step()
-          # actor
-          actor_loss = - self.critic_net.forward(trs,tra).mean()
-          self.actor_optimizer.zero_grad()
-          actor_loss.backward()
-          self.actor_optimizer.step()
+        if len(self.exp.memory) > self.batch_size:
+          batches = self.exp.sample()
+          for k, batch in enumerate(batches, 0):
+            rs,ra,rs_,rr = batch
+          #   print(rs,ra,rs_,rr)
+            # Q値を計算 
+            trs_ = torch.from_numpy(rs_.astype(np.float32)).clone()
+            trs_ = trs_.to(self.device)
+            tra_ = self.actor_target.forward(trs_)
+            Q_ = self.critic_target.forward(trs_,tra_)
+            trr = torch.from_numpy(np.array([rr]).astype(np.float32)).clone()
+            trr = trr.to(self.device)
+            ty = trr + self.gamma*Q_
+            trs = torch.from_numpy(rs.astype(np.float32)).clone()
+            trs = trs.to(self.device)
+            tra = torch.from_numpy(ra.astype(np.float32)).clone()
+            tra = tra.to(self.device)
+            Q = self.critic_net.forward(trs,tra)
+            # network更新
+            self.actor_net.train()
+            self.critic_net.train()
+            # critic
+            critic_loss = F.mse_loss(ty,Q)
+            self.critic_optimizer.zero_grad()
+            critic_loss.backward()
+            self.critic_optimizer.step()
+            # actor
+            actor_loss = - self.critic_net.forward(trs,tra).mean()
+            self.actor_optimizer.zero_grad()
+            actor_loss.backward()
+            self.actor_optimizer.step()
 
-          for target_param, param in zip(self.actor_target.parameters(), self.actor_net.parameters()):
+            for target_param, param in zip(self.actor_target.parameters(), self.actor_net.parameters()):
+                  target_param.data.copy_(target_param.data * (1.0 - self.tau) + param.data * self.tau)
+            for target_param, param in zip(self.critic_target.parameters(), self.critic_net.parameters()):
                 target_param.data.copy_(target_param.data * (1.0 - self.tau) + param.data * self.tau)
-          for target_param, param in zip(self.critic_target.parameters(), self.critic_net.parameters()):
-              target_param.data.copy_(target_param.data * (1.0 - self.tau) + param.data * self.tau)
-
-        # train
-        # self.Q[s,a] += self.alpha*(r+self.gamma*np.max(self.Q[s_,:])-self.Q[s,a])# TD学習
-        s = copy.deepcopy(s_)
+        else:
+          pass
         self.history.append(s)
+        s = copy.deepcopy(s_)
         if fin==1:
           print("\n episode end epidode:",episode,"step=",step,"\n")
           break
