@@ -1,6 +1,5 @@
 # KA's Library for RLのテスト環境
 強化学習勉強用  
-いずれはライブラリ化, kal_pythonに統合
 
 ## Libraries required for kal_RL
 - numpy == 1.22.0
@@ -10,10 +9,12 @@
 - pygame == 2.1.0
 - tensorflow == 2.11.0
 
-## @todo make rl modules like
-- dqn.py
+## rl moduled achieved
 - ddqn.py  
 - ddpg.py
+
+## @todo make rl modules like
+- dqn.py
 - A3C.py
 - A2C.py
 

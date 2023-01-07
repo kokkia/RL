@@ -1,6 +1,7 @@
 import sys
 import numpy as np
 import gym
+from gym.wrappers import RecordVideo
 import matplotlib.pyplot as plt
 import copy
 import random
@@ -14,11 +15,14 @@ import ddpg
 num = sys.argv[1]
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 # device = 'cpu'
+make_video = True
 
 class environment:
   def __init__(self):
-    # self.env = gym.make("Pendulum-v1")
-    self.env = gym.make('Pendulum-v1',render_mode="human")
+    if make_video:
+        self.env = RecordVideo(gym.make("Pendulum-v1",render_mode="rgb_array"),"video/pendulumn"+str(num))
+    else:
+        self.env = gym.make('Pendulum-v1',render_mode="human")
     self.env.reset()
     self.max_steps = self.env.spec.max_episode_steps
 
@@ -54,9 +58,9 @@ rl = ddpg.DDPG(3,1,s,env,max_steps, max_episodes,a_net,c_net,device)
 for i in range(max_steps):
     a = rl.get_action(s, greedy=True)
     r, s_, fin = env.reward(s,a)
-    # s_, r, fin, info = env.step(a)
     s = copy.deepcopy(s_)
-    env.render()
+    if not make_video:
+        env.render()
 print(s)
 
 env.close()
