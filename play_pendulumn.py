@@ -11,25 +11,50 @@ import torch.nn.functional as F
 import torch.optim as optim
 import ddpg
 
-def reward(s,a):
-    return
-
 num = sys.argv[1]
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+# device = 'cpu'
 
-# env = gym.make('CartPole-v0')
-# env = gym.make('MountainCar-v0')
-env = gym.make("Pendulum-v0")
-env.reset()
+class environment:
+  def __init__(self):
+    # self.env = gym.make("Pendulum-v1")
+    self.env = gym.make('Pendulum-v1',render_mode="human")
+    self.env.reset()
+    self.max_steps = self.env.spec.max_episode_steps
 
+  def render(self):
+    self.env.render()
+
+  def close(self):
+    self.env.close()
+
+  def reset(self):
+    s = self.env.reset()[0]
+    return s
+
+  def reward(self, s, a):
+      # env.render()
+      s_, r, terminated, truncated, info = self.env.step(a)
+      fin = terminated or truncated
+      return r, np.array(s_), fin
+
+# 環境初期化
+env = environment()
+max_steps = env.max_steps
+max_episodes = 200
 s = env.reset()
-a_net = ddpg.actor_net(3,1)
-c_net = ddpg.critic_net(4,1)
-a_net.load_state_dict(torch.load("out_RF/dnn"+str(num)+".pt"))
-rl = ddpg.DDPG(3,1,np.array(env.reset()),reward,100,a_net,c_net)
 
-for i in range(1000):
-    a = rl.action(s)
-    s_, r, fin, info = env.step(a)
+# network読み込み
+a_net = ddpg.actor_net(3,1).to(device)
+c_net = ddpg.critic_net(3,1).to(device)
+a_net.load_state_dict(torch.load("out_DDPG/dnn"+str(num)+".pt"))
+rl = ddpg.DDPG(3,1,s,env,max_steps, max_episodes,a_net,c_net,device)
+
+# play
+for i in range(max_steps):
+    a = rl.get_action(s, greedy=True)
+    r, s_, fin = env.reward(s,a)
+    # s_, r, fin, info = env.step(a)
     s = copy.deepcopy(s_)
     env.render()
 print(s)
