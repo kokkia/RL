@@ -22,9 +22,9 @@ def init_weight(size):
 class actor_net(nn.Module):
   def __init__(self,ns,na):
       super(actor_net, self).__init__()
-      self.fc1 = nn.Linear(ns, 400)
-      self.fc2 = nn.Linear(400, 300)
-      self.fc3 = nn.Linear(300, na)
+      self.fc1 = nn.Linear(ns, 50)
+      self.fc2 = nn.Linear(50, 50)
+      self.fc3 = nn.Linear(50, na)
       init_w = 3e-3
       self.fc1.weight.data = init_weight(self.fc1.weight.data.size())
       self.fc2.weight.data = init_weight(self.fc2.weight.data.size())
@@ -39,9 +39,9 @@ class actor_net(nn.Module):
 class critic_net(nn.Module):
   def __init__(self,ns,na):
       super(critic_net, self).__init__()
-      self.fc1 = nn.Linear(ns, 400)
-      self.fc2 = nn.Linear(400+na, 300)
-      self.fc3 = nn.Linear(300,1)# state value
+      self.fc1 = nn.Linear(ns, 50)
+      self.fc2 = nn.Linear(50+na, 50)
+      self.fc3 = nn.Linear(50,1)# state value
 
       init_w = 3e-4
       self.fc1.weight.data = init_weight(self.fc1.weight.data.size())
@@ -50,7 +50,8 @@ class critic_net(nn.Module):
 
   def forward(self, x, action):
       x = F.relu(self.fc1(x))
-      x = F.relu(self.fc2(torch.cat([x,action],dim=1)))
+      # print(x,action)
+      x = F.relu(self.fc2(torch.cat([x,action],dim=0)))
       x = self.fc3(x)
       return x
 
@@ -133,7 +134,7 @@ class DDPG:
         # print(s,a)
         r, s_, fin = self.env.reward(s, a)  # 行動の結果、rewardと状態が帰ってくる
         total_reward += r
-        print(s,a,s_,r)
+        # print(s,a,s_,r)
         # addmemory
         self.exp.add(s,a,s_,r)
         # replay
@@ -164,7 +165,7 @@ class DDPG:
             critic_loss.backward()
             self.critic_optimizer.step()
             # actor
-            actor_loss = - self.critic_net.forward(trs,tra).mean()
+            actor_loss = - self.critic_net.forward(trs,self.actor_net.forward(trs)).mean()
             self.actor_optimizer.zero_grad()
             actor_loss.backward()
             self.actor_optimizer.step()
@@ -193,16 +194,4 @@ class DDPG:
     plt.plot(t, l, '-k')
     plt.show()
     self.writer.close()
-
-  def reward(self, s,a):
-    return self.r(s,a)
-
-  # def action(self,s):
-  #   # s = np.array([s])
-  #   ts = torch.from_numpy(s.astype(np.float32)).clone()
-  #   # ts = ts.unsqueeze(dim=0)
-  #   # ts = torch.tensor(ts, dtype=torch.float)
-  #   ta = self.actor_target.forward(ts)
-  #   a = ta.to('cpu').detach().numpy().copy()
-  #   return a
 
