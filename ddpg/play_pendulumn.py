@@ -15,7 +15,7 @@ import ddpg
 num = sys.argv[1]
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 # device = 'cpu'
-make_video = True
+make_video = False
 
 class environment:
   def __init__(self):
