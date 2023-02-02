@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import copy
 import random
 import scipy
+from collections import deque
 
 import torch
 import torch.nn as nn
@@ -36,8 +37,8 @@ class actor_net(nn.Module):
       x = F.relu(self.fc1(x))
       x = F.relu(self.fc2(x))
       # x = torch.tanh(self.fc3(x))
-      mu = torch.tanh(self.fmu(x))
-      # mu = self.fmu(x)
+      # mu = torch.tanh(self.fmu(x))
+      mu = self.fmu(x)
       logvar = self.fvar(x)
       return mu, logvar
 
@@ -83,8 +84,13 @@ class PPO:
     # critic
     self.critic_net = critic_net
     self.critic_target = copy.deepcopy(critic_net)
-    self.critic_optimizer = optim.Adam(self.critic_net.parameters(),lr=self.lr_critic, weight_decay=0.01)
+    self.critic_optimizer = optim.Adam(self.critic_net.parameters(),lr=self.lr_critic)
     self.critic_criterion = nn.MSELoss()
+
+    # advantage 
+    self.advantage_steps = 5
+    self.reward_que = deque(maxlen=self.advantage_steps)
+    self.state_que = deque(maxlen=self.advantage_steps)
 
     # experience
     self.experiences = []
@@ -102,7 +108,11 @@ class PPO:
       logvar = tlogvar.to(device=self.device).detach().cpu().numpy().copy()
       log_cov = np.diag(logvar)
       cov = np.exp(log_cov)
-      action = np.random.multivariate_normal(mean=mu, cov=cov, size=self.na).reshape(-1)
+      try:
+        action = np.random.multivariate_normal(mean=mu, cov=cov, size=self.na).reshape(-1)
+        # print(mu,action)
+      except:
+         action = copy.deepcopy(mu)
       return action
 
   def get_action_logprob(self, s, a):
@@ -133,6 +143,9 @@ class PPO:
         # train
         if len(self.experiences) == self.batch_size or fin == True:
           batch_size = len(self.experiences)
+          # deque reset
+          self.reward_que = deque(maxlen=self.advantage_steps)
+          self.state_que = deque(maxlen=self.advantage_steps)
           if fin == True:
             R = 0
           else:
@@ -140,11 +153,21 @@ class PPO:
             R = self.critic_net.forward(torch.from_numpy(s_.astype(np.float32)).to(self.device)).detach().mean()
           for i in reversed(range(batch_size)):
             # 割引報酬計算
-            r_i = self.experiences[i][3]
-            r_i = torch.from_numpy(np.array([r_i]).astype(np.float32)).to(self.device).mean()
-            R = r_i + self.gamma * R
             s_i = self.experiences[i][0]
             a_i = self.experiences[i][1]
+            r_i = self.experiences[i][3]
+            r_i = torch.from_numpy(np.array([r_i]).astype(np.float32)).to(self.device).mean()
+            self.reward_que.appendleft(r_i)
+            self.state_que.appendleft(s_i)
+            if len(self.reward_que) < self.advantage_steps:
+               continue
+            s_ik = self.state_que[-1]
+            V_advantage = 0
+            for step in range(self.advantage_steps):
+               V_advantage += pow(self.gamma,step) * self.reward_que[step]
+            V_advantage += pow(self.gamma, self.advantage_steps)*self.critic_net.forward(torch.from_numpy(s_ik.astype(np.float32)).to(self.device)).mean()
+            # R = r_i + self.gamma * R
+            R = V_advantage
             logprob = self.get_action_logprob(s_i, a_i)
             V = self.critic_net.forward(torch.from_numpy(s_i.astype(np.float32)).to(self.device)).mean()
             # network更新

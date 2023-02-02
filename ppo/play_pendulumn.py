@@ -10,12 +10,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import ddpg
+import ppo
 
 num = sys.argv[1]
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 # device = 'cpu'
-make_video = True
+make_video = False
 
 class environment:
   def __init__(self):
@@ -38,6 +38,7 @@ class environment:
 
   def reward(self, s, a):
       # env.render()
+      a = a*2
       s_, r, terminated, truncated, info = self.env.step(a)
       fin = terminated or truncated
       return r, np.array(s_), fin
@@ -49,14 +50,15 @@ max_episodes = 200
 s = env.reset()
 
 # network読み込み
-a_net = ddpg.actor_net(3,1).to(device)
-c_net = ddpg.critic_net(3,1).to(device)
-a_net.load_state_dict(torch.load("out_DDPG/dnn"+str(num)+".pt"))
-rl = ddpg.DDPG(3,1,s,env,max_steps, max_episodes,a_net,c_net,device)
+a_net = ppo.actor_net(3,1).to(device)
+c_net = ppo.critic_net(3).to(device)
+a_net.load_state_dict(torch.load("out_PPO/dnn"+str(num)+".pt"))
+rl = ppo.PPO(3,1,env,max_steps, max_episodes,a_net,c_net,device)
 
 # play
 for i in range(max_steps):
-    a = rl.get_action(s, greedy=True)
+    # a = rl.get_action(s, greedy=True)
+    a = rl.get_action(s)
     r, s_, fin = env.reward(s,a)
     s = copy.deepcopy(s_)
     if not make_video:
