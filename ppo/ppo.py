@@ -70,7 +70,7 @@ class PPO:
     self.gamma = 0.99# 割引率
     # self.tau = 0.001# ターゲット更新率
     self.batch_size = 32
-    self.lr_actor = 1e-4
+    self.lr_actor = 0.5e-4
     self.lr_critic = 1e-4
     # self.epsilon = 1.0
 
@@ -104,15 +104,9 @@ class PPO:
       ts = torch.from_numpy(s.astype(np.float32)).clone()
       ts = ts.to(self.device)
       tmu, tlogvar = self.actor_net.forward(ts)
-      mu = tmu.to(device=self.device).detach().cpu().numpy().copy()
-      logvar = tlogvar.to(device=self.device).detach().cpu().numpy().copy()
-      log_cov = np.diag(logvar)
-      cov = np.exp(log_cov)
-      try:
-        action = np.random.multivariate_normal(mean=mu, cov=cov, size=self.na).reshape(-1)
-        # print(mu,action)
-      except:
-         action = copy.deepcopy(mu)
+      tvar = torch.exp(tlogvar)
+      ta = torch.normal(tmu, tvar)
+      action = ta.to(device=self.device).detach().cpu().numpy().copy()
       return action
 
   def get_action_logprob(self, s, a):
