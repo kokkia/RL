@@ -52,10 +52,11 @@ s = env.reset()
 # network読み込み
 a_net = a2c.actor_net(3,1).to(device)
 c_net = a2c.critic_net(3).to(device)
-a_net.load_state_dict(torch.load("out_a2c/dnn"+str(num)+".pt"))
+a_net.load_state_dict(torch.load("out_A2C/dnn"+str(num)+".pt"))
 rl = a2c.A2C(3,1,env,max_steps, max_episodes,a_net,c_net,device)
 
 # play
+total_reward = 0
 for i in range(max_steps):
     # a = rl.get_action(s, greedy=True)
     a = rl.get_action(s)
@@ -63,7 +64,8 @@ for i in range(max_steps):
     s = copy.deepcopy(s_)
     if not make_video:
         env.render()
-print(s)
+    total_reward += r
+print(s, total_reward)
 
 env.close()
 
