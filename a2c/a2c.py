@@ -4,7 +4,6 @@ import gym
 import matplotlib.pyplot as plt
 import copy
 import random
-import scipy
 from collections import deque
 
 import torch

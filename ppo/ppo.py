@@ -20,6 +20,8 @@ def init_weight(size):
 class actor_net(nn.Module):
   def __init__(self,ns,na):
       super(actor_net, self).__init__()
+      self.na = na
+      self.ns = ns
       self.fc1 = nn.Linear(ns, 50)
       self.fc2 = nn.Linear(50, 50)
       # self.fc3 = nn.Linear(50, na*2) # mu1, mu2, sigma1, sigma2
@@ -34,10 +36,10 @@ class actor_net(nn.Module):
   def forward(self, x):
       x = F.relu(self.fc1(x))
       x = F.relu(self.fc2(x))
-      # x = torch.tanh(self.fc3(x))
-      # mu = torch.tanh(self.fmu(x))
-      mu = self.fmu(x)
-      logvar = self.fvar(x)
+      mu = torch.tanh(self.fmu(x))
+      logvar = torch.tanh(self.fvar(x))
+      # mu = self.fmu(x)
+      # logvar = self.fvar(x)
       return mu, logvar
 
 class critic_net(nn.Module):
@@ -68,8 +70,8 @@ class PPO:
     self.gamma = 0.99# 割引率
     self.batch_size = 32
     # 学習率
-    self.lr_actor_initial = 1e-4
-    self.lr_actor_final = 0.1e-4
+    self.lr_actor_initial = 0.5e-4
+    self.lr_actor_final = 0.5-4
     self.lr_critic_initial = 1e-4
     self.lr_critic_final = 1e-4
     self.lr_max_steps = 500
@@ -79,7 +81,7 @@ class PPO:
     # actor
     self.actor_net = actor_net
     self.actor_target = copy.deepcopy(actor_net)
-    self.actor_optimizer = optim.Adam(self.actor_net.parameters(),lr=self.lr_actor_initial)
+    self.actor_optimizer = optim.Adam(self.actor_net.parameters(),lr=self.lr_actor_initial,weight_decay=0.01)
     self.actor_criterion = nn.MSELoss()
     # critic
     self.critic_net = critic_net
@@ -111,6 +113,7 @@ class PPO:
       tvar = torch.exp(tlogvar)
       ta = torch.normal(tmu, tvar)
       action = ta.to(device=self.device).detach().cpu().numpy().copy()
+      # print(tmu, tvar, action)
       return action
 
   def get_action_logprob(self, s, a, actor_net):
@@ -174,7 +177,7 @@ class PPO:
             r_i = self.experiences[i][3]
             
             # reward_scaling
-            r_i = r_i/(reward_std+1e-8)
+            # r_i = r_i/(reward_std+1e-8)
 
             # queに追加
             r_i = torch.from_numpy(np.array([r_i]).astype(np.float32)).to(self.device).mean()
@@ -199,9 +202,9 @@ class PPO:
             V_target += pow(self.gamma, self.advantage_steps)*self.critic_net.forward(torch.from_numpy(s_ik.astype(np.float32)).to(self.device)).mean()
             
             # Generalized Advantage Estimation
-            advantage = 0.0
-            for step in range(self.advantage_steps):
-              advantage += pow((self.lmd * self.gamma), step) * self.td_err_que[step]
+            # advantage = 0.0
+            # for step in range(self.advantage_steps):
+            #   advantage += pow((self.lmd * self.gamma), step) * self.td_err_que[step]
             
             # cliped surrogate objectives
             logprob = self.get_action_logprob(s_i, a_i, self.actor_net)
@@ -219,7 +222,9 @@ class PPO:
             
             # actor
             self.actor_net.train()
-            actor_loss = - torch.minimum(ratio*advantage.detach(),ratio_clipped*advantage.detach()).mean()
+            advantage = V_target - V
+            actor_loss = - logprob * advantage.detach()
+            # actor_loss = - torch.minimum(ratio*advantage.detach(),ratio_clipped*advantage.detach()).mean()
             actor_loss = actor_loss.mean()
             self.actor_optimizer.zero_grad()
             actor_loss.backward()
@@ -233,7 +238,7 @@ class PPO:
         if fin==1:
           print("\n episode end epidode:",episode,"step=",step,"\n")
           break
-      self.scheduling_adam_lr(episode)
+      # self.scheduling_adam_lr(episode)
       print("total_reward", total_reward)
       if (episode + 1) % 10 == 0:
         torch.save(self.actor_target.state_dict(), "out_PPO/dnn" + str(episode + 1) +".pt")
