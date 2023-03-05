@@ -74,8 +74,8 @@ class PPO:
     self.gamma = 0.99# 割引率
     self.batch_size = 32
     # 学習率
-    self.lr_actor_initial = 0.5e-4
-    self.lr_actor_final = 0.5-4
+    self.lr_actor_initial = 1e-4
+    self.lr_actor_final = 1e-4
     self.lr_critic_initial = 1e-4
     self.lr_critic_final = 1e-4
     self.lr_max_steps = 500
@@ -117,6 +117,7 @@ class PPO:
       tvar = torch.exp(tlogvar)
       ta = torch.normal(tmu, tvar)
       action = ta.to(device=self.device).detach().cpu().numpy().copy()
+      # action = tmu.to(device=self.device).detach().cpu().numpy().copy()
       # print(tmu, tvar, action)
       return action
 
