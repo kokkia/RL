@@ -24,7 +24,7 @@ class actor_net(nn.Module):
       self.ns = ns
       self.fc1 = nn.Linear(ns, 50)
       self.fc2 = nn.Linear(50, 50)
-      # self.fc3 = nn.Linear(50, na*2) # mu1, mu2, sigma1, sigma2
+      self.fc3 = nn.Linear(50, 50)
       self.fmu = nn.Linear(50, na)
       self.fvar = nn.Linear(50, na)
       init_w = 3e-3
@@ -36,6 +36,7 @@ class actor_net(nn.Module):
   def forward(self, x):
       x = F.relu(self.fc1(x))
       x = F.relu(self.fc2(x))
+      x = F.relu(self.fc3(x))
       mu = torch.tanh(self.fmu(x))
       logvar = torch.tanh(self.fvar(x))
       # mu = self.fmu(x)
@@ -47,17 +48,20 @@ class critic_net(nn.Module):
       super(critic_net, self).__init__()
       self.fc1 = nn.Linear(ns, 50)
       self.fc2 = nn.Linear(50, 50)
-      self.fc3 = nn.Linear(50,1)# state value
+      self.fc3 = nn.Linear(50, 50)
+      self.fc4 = nn.Linear(50,1)# state value
 
       init_w = 3e-4
       self.fc1.weight.data = init_weight(self.fc1.weight.data.size())
       self.fc2.weight.data = init_weight(self.fc2.weight.data.size())
-      self.fc3.weight.data.uniform_(-init_w, init_w)
+      self.fc3.weight.data = init_weight(self.fc2.weight.data.size())
+      self.fc4.weight.data.uniform_(-init_w, init_w)
 
   def forward(self, x):
       x = F.relu(self.fc1(x))
       x = F.relu(self.fc2(x))
-      x = self.fc3(x)
+      x = F.relu(self.fc3(x))
+      x = self.fc4(x)
       return x
 
 class PPO:
@@ -166,7 +170,7 @@ class PPO:
             s_ = self.experiences[-1][2]
             R = self.critic_net.forward(torch.from_numpy(s_.astype(np.float32)).to(self.device)).detach().mean()
           # rewardsの標準偏差計算
-          reward_std = np.std(np.array(rewards))
+          # reward_std = np.std(np.array(rewards))
           # 過去の方策を保存
           actor_net_old = copy.deepcopy(self.actor_net)
           for i in reversed(range(batch_size)):
