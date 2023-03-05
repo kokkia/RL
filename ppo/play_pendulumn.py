@@ -56,6 +56,7 @@ a_net.load_state_dict(torch.load("out_PPO/dnn"+str(num)+".pt"))
 rl = ppo.PPO(3,1,env,max_steps, max_episodes,a_net,c_net,device)
 
 # play
+total_reward = 0
 for i in range(max_steps):
     # a = rl.get_action(s, greedy=True)
     a = rl.get_action(s)
@@ -63,7 +64,8 @@ for i in range(max_steps):
     s = copy.deepcopy(s_)
     if not make_video:
         env.render()
-print(s)
+    total_reward += r
+print(s, total_reward)
 
 env.close()
 

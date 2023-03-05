@@ -35,7 +35,7 @@ class environment:
 
 env = environment()
 max_steps = env.max_steps
-max_episodes = 5000
+max_episodes = 3000
 a_net = ppo.actor_net(3,1).to(device)
 c_net = ppo.critic_net(3).to(device)
 rl = ppo.PPO(3,1,env,max_steps, max_episodes,a_net,c_net,device)

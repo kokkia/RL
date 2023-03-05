@@ -84,12 +84,10 @@ class PPO:
     
     # actor
     self.actor_net = actor_net
-    self.actor_target = copy.deepcopy(actor_net)
     self.actor_optimizer = optim.Adam(self.actor_net.parameters(),lr=self.lr_actor_initial,weight_decay=0.01)
     self.actor_criterion = nn.MSELoss()
     # critic
     self.critic_net = critic_net
-    self.critic_target = copy.deepcopy(critic_net)
     self.critic_optimizer = optim.Adam(self.critic_net.parameters(),lr=self.lr_critic_initial)
     self.critic_criterion = nn.MSELoss()
 
@@ -246,7 +244,7 @@ class PPO:
       # self.scheduling_adam_lr(episode)
       print("total_reward", total_reward)
       if (episode + 1) % 10 == 0:
-        torch.save(self.actor_target.state_dict(), "out_PPO/dnn" + str(episode + 1) +".pt")
+        torch.save(self.actor_net.state_dict(), "out_PPO/dnn" + str(episode + 1) +".pt")
         print("critic loss=",critic_loss)
       self.writer.add_scalar("total reward", total_reward,episode)
       self.writer.add_scalar("critic_loss", critic_loss, episode)
