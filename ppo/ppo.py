@@ -91,12 +91,7 @@ class PPO:
     self.critic_optimizer = optim.Adam(self.critic_net.parameters(),lr=self.lr_critic_initial)
     self.critic_criterion = nn.MSELoss()
 
-    # advantage 
-    self.advantage_steps = 5
-    self.reward_que = deque(maxlen=self.advantage_steps)
-    self.state_que = deque(maxlen=self.advantage_steps)
-    self.td_err_que = deque(maxlen=self.advantage_steps)
-
+    # param
     self.clip_range = 0.2
     self.lmd = 1.0
 
@@ -159,9 +154,6 @@ class PPO:
         # train
         if len(self.experiences) == self.batch_size or fin == True:
           batch_size = len(self.experiences)
-          # deque reset
-          self.reward_que = deque(maxlen=self.advantage_steps)
-          self.state_que = deque(maxlen=self.advantage_steps)
           # 初期値計算
           if fin == True:
             R = 0
@@ -185,18 +177,11 @@ class PPO:
 
             # queに追加
             r_i = torch.from_numpy(np.array([r_i]).astype(np.float32)).to(self.device).mean()
-            self.reward_que.appendleft(r_i)
-            self.state_que.appendleft(s_i)
             
             # TD
             V_st = self.critic_net.forward(torch.from_numpy(s_i.astype(np.float32)).to(self.device)).mean()
             V_st_ = self.critic_net.forward(torch.from_numpy(s_i_.astype(np.float32)).to(self.device)).mean()
             td_err = r_i + self.gamma * V_st_ - V_st
-            self.td_err_que.appendleft(td_err)
-            
-            # steps未満であれば学習開始しない
-            if len(self.reward_que) < self.advantage_steps:
-               continue
             
             # Generalized Advantage Estimation
             advantage = td_err + (self.lmd * self.gamma) * advantage
