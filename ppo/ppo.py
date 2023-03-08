@@ -198,17 +198,7 @@ class PPO:
             if len(self.reward_que) < self.advantage_steps:
                continue
             
-            # TD(n)errorの計算
-            # s_ik = self.state_que[-1]
-            # V_target = 0.0
-            # for step in range(self.advantage_steps):
-            #    V_target += pow(self.gamma,step) * self.reward_que[step]
-            # V_target += pow(self.gamma, self.advantage_steps)*self.critic_net.forward(torch.from_numpy(s_ik.astype(np.float32)).to(self.device)).mean()
-            
             # Generalized Advantage Estimation
-            # advantage = 0.0
-            # for step in range(self.advantage_steps):
-            #   advantage += pow((self.lmd * self.gamma), step) * self.td_err_que[step]
             advantage = td_err + (self.lmd * self.gamma) * advantage
             
             # cliped surrogate objectives
@@ -228,9 +218,6 @@ class PPO:
             
             # actor
             self.actor_net.train()
-
-            # advantage = V_target - V
-            # actor_loss = - logprob * advantage.detach()
             actor_loss = - torch.minimum(ratio*advantage.detach(),ratio_clipped*advantage.detach()).mean()
             self.actor_optimizer.zero_grad()
             actor_loss.backward()
