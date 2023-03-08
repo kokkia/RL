@@ -76,9 +76,9 @@ class PPO:
     # 学習率
     self.lr_actor_initial = 1e-4
     self.lr_actor_final = 1e-4
-    self.lr_critic_initial = 1e-4
-    self.lr_critic_final = 1e-4
-    self.lr_max_steps = 500
+    self.lr_critic_initial = 0.1e-4
+    self.lr_critic_final = 0.1e-4
+    self.lr_max_steps = 5000
 
     self.device = device
     
@@ -216,7 +216,7 @@ class PPO:
         if fin==1:
           print("\n episode end epidode:",episode,"step=",step,"\n")
           break
-      # self.scheduling_adam_lr(episode)
+      self.scheduling_adam_lr(episode)
       print("total_reward", total_reward)
       if (episode + 1) % 10 == 0:
         torch.save(self.actor_net.state_dict(), "out_PPO/dnn" + str(episode + 1) +".pt")
