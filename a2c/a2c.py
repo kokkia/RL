@@ -116,7 +116,7 @@ class A2C:
       ta = torch.normal(tmu, tvar)
       action = ta.to(device=self.device).detach().cpu().numpy().copy()
       # action = tmu.to(device=self.device).detach().cpu().numpy().copy()
-      print(tmu, tvar, action)
+      # print(tmu, tvar, action)
       return action
 
   def get_action_logprob(self, s, a, actor_net):

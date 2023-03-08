@@ -98,7 +98,7 @@ class PPO:
     self.td_err_que = deque(maxlen=self.advantage_steps)
 
     self.clip_range = 0.2
-    self.lmd = 0.95
+    self.lmd = 1.0
 
     # experience
     self.experiences = []
@@ -169,9 +169,10 @@ class PPO:
             s_ = self.experiences[-1][2]
             R = self.critic_net.forward(torch.from_numpy(s_.astype(np.float32)).to(self.device)).detach().mean()
           # rewardsの標準偏差計算
-          # reward_std = np.std(np.array(rewards))
+          reward_std = np.std(np.array(rewards))
           # 過去の方策を保存
           actor_net_old = copy.deepcopy(self.actor_net)
+          advantage = 0.0
           for i in reversed(range(batch_size)):
             # batchから取得
             s_i = self.experiences[i][0]
@@ -198,25 +199,27 @@ class PPO:
                continue
             
             # TD(n)errorの計算
-            s_ik = self.state_que[-1]
-            V_target = 0.0
-            for step in range(self.advantage_steps):
-               V_target += pow(self.gamma,step) * self.reward_que[step]
-            V_target += pow(self.gamma, self.advantage_steps)*self.critic_net.forward(torch.from_numpy(s_ik.astype(np.float32)).to(self.device)).mean()
+            # s_ik = self.state_que[-1]
+            # V_target = 0.0
+            # for step in range(self.advantage_steps):
+            #    V_target += pow(self.gamma,step) * self.reward_que[step]
+            # V_target += pow(self.gamma, self.advantage_steps)*self.critic_net.forward(torch.from_numpy(s_ik.astype(np.float32)).to(self.device)).mean()
             
             # Generalized Advantage Estimation
             # advantage = 0.0
             # for step in range(self.advantage_steps):
             #   advantage += pow((self.lmd * self.gamma), step) * self.td_err_que[step]
+            advantage = td_err + (self.lmd * self.gamma) * advantage
             
             # cliped surrogate objectives
             logprob = self.get_action_logprob(s_i, a_i, self.actor_net)
-            logprob_old = self.get_action_logprob(s_i, a_i, actor_net_old).detach()
-            ratio = torch.exp(logprob-logprob_old)
+            logprob_old = self.get_action_logprob(s_i, a_i, actor_net_old)
+            ratio = torch.exp(logprob-logprob_old-1e-8)
             ratio_clipped = torch.clip(ratio,1-self.clip_range, 1+self.clip_range)
             
             # critic
             V = self.critic_net.forward(torch.from_numpy(s_i.astype(np.float32)).to(self.device)).mean()
+            V_target = advantage.detach() + V.detach()
             self.critic_net.train()
             critic_loss = F.mse_loss(V_target, V)
             self.critic_optimizer.zero_grad()
@@ -225,10 +228,10 @@ class PPO:
             
             # actor
             self.actor_net.train()
-            advantage = V_target - V
-            actor_loss = - logprob * advantage.detach()
-            # actor_loss = - torch.minimum(ratio*advantage.detach(),ratio_clipped*advantage.detach()).mean()
-            actor_loss = actor_loss.mean()
+
+            # advantage = V_target - V
+            # actor_loss = - logprob * advantage.detach()
+            actor_loss = - torch.minimum(ratio*advantage.detach(),ratio_clipped*advantage.detach()).mean()
             self.actor_optimizer.zero_grad()
             actor_loss.backward()
             self.actor_optimizer.step()
