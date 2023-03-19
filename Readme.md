@@ -12,11 +12,15 @@
 ## rl moduled achieved
 - ddqn.py  
 - ddpg.py
+- A2C
+- PPO
 
 ## @todo make rl modules like
 - dqn.py
+- REINFORCE
 - A3C.py
-- A2C.py
+- TD3
+- SAC
 
 ## Error
 - tensorboard : command not found  
