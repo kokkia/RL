@@ -4,11 +4,6 @@ import matplotlib.pyplot as plt
 import copy
 import random
 
-# selflibrary 
-import sys
-sys.path.append("../env")
-import maze_env
-
 class value_iteration:
     def __init__(self, states, actions, env, max_steps):
         self.states = states
@@ -47,25 +42,3 @@ class value_iteration:
         #         ret_action = action 
         return ret_action
     
-env = maze_env.maze_env(maze_env.RENDER)
-states = copy.deepcopy(env.states)
-actions = copy.deepcopy(env.actions)
-dp = value_iteration(states, actions, env, 30)
-dp.learn()
-print("value", dp.V)
-print("Q", dp.Q)
-
-fin = 0
-state = 6
-env.render(state)
-for i in range(30):
-    action = dp.get_action(state)
-    print(action)
-    r, next_state, fin = env.reward(state, action)
-    state = next_state
-    env.render(state)
-    if fin == 1:
-        break
-print("fin", fin)
-
-plt.show()
