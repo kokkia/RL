@@ -9,7 +9,7 @@ VIDEO = 1
 RENDER = 2
 
 class maze_env:
-    def __init__(self, mode=TRAINING):
+    def __init__(self, mode=TRAINING, fig=None, ax=None):
         # 行は状態0～7、列は移動方向で↑、→、↓、←を表す
         self.maze = np.array([[0, 1, 1, 0, 0],  # s0
                         [0, 1, 0, 1, 0],  # s1
@@ -31,7 +31,8 @@ class maze_env:
 
         # fig
         self.mode = mode
-        self.fig = plt.figure(figsize=(5, 5))
+        self.fig = fig
+        self.ax = ax
         self.setup_figure()
 
     def render(self, state):
@@ -79,7 +80,7 @@ class maze_env:
 
     def setup_figure(self, state=0):
         # 図を描く大きさと、図の変数名を宣言
-        self.ax = plt.gca()
+        # self.ax = plt.gca()
         # 赤い壁を描く
         plt.plot([1, 1], [0, 1], color='red', linewidth=2)
         plt.plot([1, 2], [2, 2], color='red', linewidth=2)
