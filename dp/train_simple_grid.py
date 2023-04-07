@@ -6,23 +6,24 @@ import random
 
 # selflibrary 
 sys.path.append("../env")
-import maze_env
+import simple_grid_env
 import value_iteration
 
 # fig
 fig = plt.figure(figsize=(10,5))
 ax1 = fig.add_subplot(1,2,1)
 ax2 = fig.add_subplot(1,2,2)
-
-env = maze_env.maze_env(maze_env.RENDER, fig, ax1)
+size =10 
+env = simple_grid_env.simple_grid_env(simple_grid_env.RENDER, size, fig, ax1)
+# env.draw_reward()
 states = copy.deepcopy(env.states)
-actions = copy.deepcopy(env.actions)
-dp = value_iteration.value_iteration(states, actions, env, 10, fig, ax2)
+actions = [0, 1, 2, 3]
+dp = value_iteration.value_iteration(states, actions, env, 40, fig, ax2)
 dp.learn()
 print("value", dp.V)
 print("Q", dp.Q)
 
-dp.plot_state_value(3,3)
+dp.plot_state_value(size,size)
 fin = 0
 state =0
 env.render(state)
