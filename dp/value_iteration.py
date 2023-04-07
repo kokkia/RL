@@ -1,11 +1,12 @@
 import sys
 import numpy as np
 import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 import copy
 import random
 
 class value_iteration:
-    def __init__(self, states, actions, env, max_steps):
+    def __init__(self, states, actions, env, max_steps, fig_on=False):
         self.states = states
         self.actions = actions
         self.ns = len(states)
@@ -15,6 +16,10 @@ class value_iteration:
         self.V = np.zeros([self.ns])
         self.Q = np.zeros([self.ns, self.na])
         self.gamma = 0.95
+        self.fig_on = fig_on
+        if self.fig_on:
+            self.fig = plt.figure(figsize=(5, 5))
+            self.ax = plt.gca()
         return 
 
     def learn(self):
@@ -41,4 +46,20 @@ class value_iteration:
         #         V_max = copy.deepcopy(self.V[next_state])
         #         ret_action = action 
         return ret_action
+        
+    def plot_state_value(self, x_range, y_range):
+        if not self.fig_on:
+            return
+        style = { 
+            'border': {'color': 'red', 'linewidth': 0.5},
+        }
+        p = self.ax.imshow(np.reshape(self.V, (3,3)))
+        divider = make_axes_locatable(self.ax)
+        cax = divider.append_axes('right', size='5%', pad=0.05)
+        self.fig.colorbar(p, cax=cax)
+        return
+        
+
+
+
     

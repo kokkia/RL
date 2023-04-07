@@ -9,25 +9,14 @@ VIDEO = 1
 RENDER = 2
 
 class maze_env:
-    def __init__(self, mode=TRAINING):
+    def __init__(self, mode=TRAINING, size=4):
         # 行は状態0～7、列は移動方向で↑、→、↓、←を表す
-        self.maze = np.array([[0, 1, 1, 0, 0],  # s0
-                        [0, 1, 0, 1, 0],  # s1
-                        [0, 0, 1, 1, 0],  # s2
-                        [1, 1, 1, 0, 0],  # s3
-                        [0, 0, 1, 1, 0],  # s4
-                        [1, 0, 0, 0, 0],  # s5
-                        [1, 0, 0, 0, 0],  # s6
-                        [1, 1, 0, 0, 0],  # s7、※s8はゴールなので、方策はなし
-                        [0, 0, 0, 1, 0],  # s7、※s8はゴールなので、方策はなし
-                        ])
-        self.direction = ["up", "right", "down", "left", "stay"]
-        self.reset()
         self.max_steps = 50
         self.states = [0,1,2,3,4,5,6,7,8] 
-        self.actions = [0,1,2,3,4]
-        self.ns = 9
-        self.na = 4
+        self.actions = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+        self.ns = size**2
+        self.na = len(self.actions)
+        self.reset()
 
         # fig
         self.mode = mode
