@@ -22,7 +22,8 @@ class simple_grid_env:
 
         self.s_goal = self.ns-1
         self.R = np.zeros([self.ns])
-        # self.R[-10] = 20
+        self.R[-21] = -400
+        self.R[-32] = -400
         self.R[self.s_goal] = 40
 
         # fig
@@ -51,7 +52,6 @@ class simple_grid_env:
         fin = 0
         s_next = self.state_index_transition(s, a)
         r = self.R[s_next]
-        
         if s_next == self.s_goal:
             fin = 1
 

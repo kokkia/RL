@@ -37,11 +37,12 @@ class value_iteration:
     def get_action(self, state):
         ret_action = 0
         # ret_action = np.argmax(self.Q[state,:])
-        V_max = -1e6
+        Q_max = -1e6
         for action in self.actions:
             R, next_state, fin = self.env.reward(state, action)
-            if self.V[next_state] > V_max:
-                V_max = copy.deepcopy(self.V[next_state])
+            Q_tmp = R + self.gamma * self.V[next_state]
+            if Q_tmp > Q_max:
+                Q_max = Q_tmp
                 ret_action = action 
         return ret_action
         
