@@ -31,6 +31,10 @@ class simple_grid_env:
         self.fig = fig
         self.ax = ax
 
+    def set_reward(self, R):
+        self.R = R
+        return
+
     def render(self, state):
         self.ax.cla()
         # for stopping simulation with the esc key.

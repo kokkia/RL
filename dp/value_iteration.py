@@ -19,6 +19,10 @@ class value_iteration:
         self.fig = fig
         self.ax = ax
         return 
+    
+    def set_env(self, env):
+        self.env = env
+        return
 
     def learn(self):
         for step in range(self.max_steps):
@@ -53,6 +57,7 @@ class value_iteration:
         divider = make_axes_locatable(self.ax)
         cax = divider.append_axes('right', size='5%', pad=0.05)
         self.fig.colorbar(p, cax=cax)
+        plt.pause(1.0)
         return
         
 
