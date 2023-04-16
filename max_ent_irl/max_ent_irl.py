@@ -75,7 +75,7 @@ class max_ent_irl:
             self.theta = self.theta - self.alpha * grad
 
         self.R = self.theta * self.phi
-        return self.R
+        return
 
     def plot_reward(self, x_range, y_range):
         if self.fig == None:
