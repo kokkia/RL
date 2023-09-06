@@ -10,13 +10,21 @@
 - tensorflow == 2.11.0
 
 ## rl moduled achieved
-- ddqn.py  
-- ddpg.py
+- DDQN  
+- DDPG
+- A2C
+- PPO
+- DynamicPrograming
+- MaximumEntropyIRL
 
 ## @todo make rl modules like
-- dqn.py
-- A3C.py
-- A2C.py
+- SAC
+- TD3
+- Maximum Entropy Deep IRL
+
+## Demo
+
+https://github.com/kokkia/RL/assets/40203299/364e60c9-ef93-4995-a588-28ff9b80d0e7
 
 ## Error
 - tensorboard : command not found  
